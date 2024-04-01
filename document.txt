@@ -52,3 +52,5 @@ Soure code: https://github.com/bhrugen/MagicVilla_API
 -  Nếu annotation ApiController không có thì modelstate sẽ thực thi nhưng những annotation ở class define sẽ bị bỏ qua
 
 - Để sử dụng method Patch thì import thư viện: Microsoft.AspNetCore.JsonPatch để sử dụng template của method và include Microsoft.AspNetCore.Mvc.NewtonsoftJson để sử dụng json
+
+- Sử dụng automaper để map object
