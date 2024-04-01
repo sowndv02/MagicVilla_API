@@ -1,0 +1,54 @@
+=================================================Request Object, Response Object====================================================
+
+Request: Verb, Header, Content
+- Http Verbs/ Actions:
++ GET: Fetches/Request Resource
++ POST: Creates/ Inserts Resource
++ PUT: Updates/Modifies Resource
++ PATCH: Updates/Modifies Partial Resource
++ DELETE: Deletes/Remove Resource
+
+- Headers/ Request's Metadata:
++ Content Type: Content's format
++ Content Length: Size of the content
++ Authorization: Who is making request
++ Accept: What are the accepted type(s)
+
+- Content/ Request's Content
++ HTML, CSS, XML, JSON
++ information for the request
++ Blobs etc.
+
+Response: StatusCode, Header, Content
+
+- Status codes for Operation Result
++ 100-199: Informaton
++ 200-299: Success
+	+ 200 - OK
+	+ 201 - CREATED
+	+ 204 - NO Content
+	
++ 300-399: Redirection
++ 400-499: Client Errors
+	+ 400 - Bad Request
+	+ 404 - Not Found
+	+ 409 - Conflict
++ 500-599: Server Errors
+	+ 500 - Internal Server Error
+
+- Header/ Response's Metadata:
++ Content Type: content format
++ Content Length: Size of the Content
++ Expires: When is this invalid
+
+- Content: 
++ HTML, CSS, XML, JSON
++ Blobs etc.
+
+Soure code: https://github.com/bhrugen/MagicVilla_API
+
+
+- Khi có annotation ApiController thì modelstate sẽ bị bỏ qua
+-  Nếu annotation ApiController không có thì modelstate sẽ thực thi nhưng những annotation ở class define sẽ bị bỏ qua
+
+- Để sử dụng method Patch thì import thư viện: Microsoft.AspNetCore.JsonPatch để sử dụng template của method và include Microsoft.AspNetCore.Mvc.NewtonsoftJson để sử dụng json
