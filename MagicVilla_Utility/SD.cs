@@ -1,4 +1,6 @@
-﻿namespace MagicVilla_Utility
+﻿using System.Runtime.CompilerServices;
+
+namespace MagicVilla_Utility
 {
     public static class SD
     {
@@ -6,6 +8,8 @@
         {
             GET, POST, PUT, DELETE
         }
+
+        public static string SessionToken = "JWTToken";
 
     }
 }
