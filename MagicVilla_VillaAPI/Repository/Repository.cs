@@ -1,12 +1,11 @@
 ﻿using MagicVilla_VillaAPI.Data;
-using MagicVilla_VillaAPI.Models;
 using MagicVilla_VillaAPI.Repository.IRepository;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace MagicVilla_VillaAPI.Repository
 {
-    public class Repository<T> : IRepository<T> where T : class 
+    public class Repository<T> : IRepository<T> where T : class
     {
         private readonly ApplicationDbContext _context;
         internal DbSet<T> dbset;
@@ -31,7 +30,7 @@ namespace MagicVilla_VillaAPI.Repository
 
             if (filter != null)
                 query.Where(filter);
-            return await query.FirstOrDefaultAsync();
+            return await query.FirstOrDefaultAsync(filter);
         }
 
         public async Task<List<T>> GetAllAsync(Expression<Func<T, bool>>? filter = null)
@@ -46,7 +45,7 @@ namespace MagicVilla_VillaAPI.Repository
         {
             await _context.SaveChangesAsync();
         }
-        
+
         public async Task RemoveAsync(T entity)
         {
             dbset.Remove(entity);

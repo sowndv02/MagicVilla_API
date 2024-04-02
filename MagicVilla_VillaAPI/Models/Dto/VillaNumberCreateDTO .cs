@@ -2,10 +2,12 @@
 
 namespace MagicVilla_VillaAPI.Models.Dto
 {
-    public class VillaCreateDTO
+    public class VillaNumberCreateDTO
     {
         [Required]
-        public string VillaNo { get; set; }
+        public int VillaNo { get; set; }
+        [Required]
+        public int VillaId { get; set; }
         public string SpecialDetails { get; set; }
     }
 }

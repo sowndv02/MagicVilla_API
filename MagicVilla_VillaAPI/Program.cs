@@ -16,9 +16,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(option =>
 });
 
 Log.Logger = new LoggerConfiguration().MinimumLevel.Debug()
-    .WriteTo.File("log/villaLogs.txt", rollingInterval:RollingInterval.Day).CreateLogger();
+    .WriteTo.File("log/villaLogs.txt", rollingInterval: RollingInterval.Day).CreateLogger();
 
 builder.Services.AddScoped<IVillaRepository, VillaRepository>();
+builder.Services.AddScoped<IVillaNumberRepository, VillaNumberRepository>();
 builder.Services.AddAutoMapper(typeof(MappingConfig));
 
 builder.Host.UseSerilog();

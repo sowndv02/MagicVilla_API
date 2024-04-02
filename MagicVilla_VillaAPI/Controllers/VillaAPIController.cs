@@ -1,11 +1,9 @@
 ﻿using AutoMapper;
-using MagicVilla_VillaAPI.Data;
 using MagicVilla_VillaAPI.Models;
 using MagicVilla_VillaAPI.Models.Dto;
 using MagicVilla_VillaAPI.Repository.IRepository;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Net;
 
 namespace MagicVilla_VillaAPI.Controllers
@@ -18,9 +16,9 @@ namespace MagicVilla_VillaAPI.Controllers
 
         protected APIResponse _response;
         private readonly ILogger<VillaAPIController> _logger;
-        private readonly IVillaRepository _context; 
-        private readonly IMapper _mapper; 
-        public VillaAPIController(IMapper mapper,ILogger<VillaAPIController> logger, IVillaRepository context) 
+        private readonly IVillaRepository _context;
+        private readonly IMapper _mapper;
+        public VillaAPIController(IMapper mapper, ILogger<VillaAPIController> logger, IVillaRepository context)
         {
             _context = context;
             _logger = logger;
@@ -42,7 +40,7 @@ namespace MagicVilla_VillaAPI.Controllers
                 _response.StatusCode = HttpStatusCode.OK;
                 return Ok(_response);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _response.IsSuccess = false;
                 _response.ErrorMessages = new List<string>() { ex.ToString() };
@@ -64,15 +62,16 @@ namespace MagicVilla_VillaAPI.Controllers
                 {
                     _logger.LogError($"Get villa error with id {id}");
                     _response.StatusCode = HttpStatusCode.BadRequest;
+                    _response.IsSuccess = false;
                     return BadRequest(_response);
                 }
                 var villa = await _context.GetAsync(x => x.Id == id);
 
-                if (villa == null) 
+                if (villa == null)
                 {
                     _response.StatusCode = HttpStatusCode.NotFound;
                     return NotFound(_response);
-                } 
+                }
 
                 _response.Result = _mapper.Map<VillaDTO>(villa);
                 _response.StatusCode = HttpStatusCode.OK;
@@ -84,7 +83,7 @@ namespace MagicVilla_VillaAPI.Controllers
                 _response.ErrorMessages = new List<string>() { ex.ToString() };
             }
             return _response;
-            
+
         }
 
 
@@ -103,8 +102,9 @@ namespace MagicVilla_VillaAPI.Controllers
 
                 if (await _context.GetAsync(x => x.Name.ToLower() == createDTO.Name.ToLower()) != null)
                 {
-                    ModelState.AddModelError("CustomError", "Villa already Exists!");
-                    return BadRequest(ModelState);
+                    _response.StatusCode = HttpStatusCode.BadRequest;
+                    _response.IsSuccess = false;
+                    return BadRequest(_response);
                 }
 
                 if (createDTO == null) return BadRequest(createDTO);
@@ -206,7 +206,7 @@ namespace MagicVilla_VillaAPI.Controllers
                 _response.ErrorMessages = new List<string>() { ex.ToString() };
             }
             return _response;
-            
+
         }
 
 
@@ -218,7 +218,7 @@ namespace MagicVilla_VillaAPI.Controllers
         {
             if (patchDTO == null || id == 0) return BadRequest();
 
-            var villa = await _context.GetAsync(x => x.Id == id, tracked:false);
+            var villa = await _context.GetAsync(x => x.Id == id, tracked: false);
             if (villa == null) return NotFound();
 
             VillaUpdateDTO villaDTO = _mapper.Map<VillaUpdateDTO>(villa);
