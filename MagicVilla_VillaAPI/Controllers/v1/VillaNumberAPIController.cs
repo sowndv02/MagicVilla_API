@@ -6,10 +6,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 
-namespace MagicVilla_VillaAPI.Controllers
+namespace MagicVilla_VillaAPI.Controllers.v1
 {
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     [ApiController]
+    //[ApiVersion("1.0", Deprecated = true)]
+    [ApiVersion("1.0")]
     public class VillaNumberAPIController : ControllerBase
     {
 
@@ -24,18 +26,19 @@ namespace MagicVilla_VillaAPI.Controllers
             _context = context;
             _logger = logger;
             _mapper = mapper;
-            this._response = new();
+            _response = new();
         }
 
         [HttpGet]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        //[MapToApiVersion("1.0")]
         public async Task<ActionResult<APIResponse>> GetVillaNumbers()
         {
             _logger.LogInformation("Getting all villanumbers");
             try
             {
-                IEnumerable<VillaNumber> villaList = await _context.GetAllAsync(includeProperties:"Villa");
+                IEnumerable<VillaNumber> villaList = await _context.GetAllAsync(includeProperties: "Villa");
                 _response.Result = _mapper.Map<List<VillaNumberDTO>>(villaList);
                 _response.StatusCode = HttpStatusCode.OK;
                 return Ok(_response);
@@ -87,7 +90,7 @@ namespace MagicVilla_VillaAPI.Controllers
 
 
         [HttpPost]
-        [Authorize(Roles ="admin")]
+        [Authorize(Roles = "admin")]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -185,6 +188,12 @@ namespace MagicVilla_VillaAPI.Controllers
                 _response.ErrorMessages = new List<string>() { ex.ToString() };
             }
             return _response;
+        }
+
+        [HttpGet("GetString")]
+        public IEnumerable<string> Get()
+        {
+            return new string[] { "value1 version2", "value2 version2" };
         }
 
     }

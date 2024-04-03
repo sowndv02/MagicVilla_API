@@ -7,11 +7,13 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 
-namespace MagicVilla_VillaAPI.Controllers
+namespace MagicVilla_VillaAPI.Controllers.v1
 {
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     //[Route("api/VillaAPI")]
     [ApiController]
+    //[ApiVersion("1.0")]
+    [ApiVersionNeutral]
     public class VillaAPIController : ControllerBase
     {
 
@@ -24,21 +26,22 @@ namespace MagicVilla_VillaAPI.Controllers
             _context = context;
             _logger = logger;
             _mapper = mapper;
-            this._response = new();
+            _response = new();
         }
 
 
         [HttpGet]
+        [ResponseCache(CacheProfileName = "Default30")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<APIResponse>> GetVillas()
+        public async Task<ActionResult<APIResponse>> GetVillas([FromQuery] int? occupancy)
         {
             _logger.LogInformation("Getting all villas");
 
             try
             {
-                IEnumerable<Villa> villaList = await _context.GetAllAsync();
+                IEnumerable<Villa> villaList = await _context.GetAllAsync(u => u.Occupancy == occupancy);
                 _response.Result = _mapper.Map<List<VillaDTO>>(villaList);
                 _response.StatusCode = HttpStatusCode.OK;
                 return Ok(_response);
@@ -53,13 +56,14 @@ namespace MagicVilla_VillaAPI.Controllers
 
 
         [HttpGet("{id:int}", Name = "GetVilla")]
-        [Authorize(Roles ="admin")]
+        [Authorize(Roles = "admin")]
         //[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VillaDTO))]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        //[ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
         public async Task<ActionResult<APIResponse>> GetVilla(int id)
         {
             try
@@ -140,7 +144,7 @@ namespace MagicVilla_VillaAPI.Controllers
 
                 _response.Result = _mapper.Map<VillaDTO>(model);
                 _response.StatusCode = HttpStatusCode.Created;
-                return CreatedAtRoute("GetVilla", new { Id = model.Id }, _response);
+                return CreatedAtRoute("GetVilla", new { model.Id }, _response);
             }
             catch (Exception ex)
             {
