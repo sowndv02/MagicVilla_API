@@ -4,8 +4,10 @@ using MagicVilla_VillaAPI.Models;
 using MagicVilla_VillaAPI.Models.Dto;
 using MagicVilla_VillaAPI.Repository.IRepository;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Runtime;
 using System.Security.Claims;
 using System.Text;
 
@@ -19,11 +21,11 @@ namespace MagicVilla_VillaAPI.Repository
         private readonly RoleManager<IdentityRole> _roleManager;
         private string secretKey;
 
-        public UserRepository(ApplicationDbContext db, IConfiguration configuration, UserManager<ApplicationUser> userManager, IMapper mapper, RoleManager<IdentityRole> roleManager) 
+        public UserRepository(ApplicationDbContext db, IConfiguration configuration, UserManager<ApplicationUser> userManager, IMapper mapper, RoleManager<IdentityRole> roleManager)
         {
             _roleManager = roleManager;
             _mapper = mapper;
-            _userManager = userManager; 
+            _userManager = userManager;
             _db = db;
             secretKey = configuration.GetValue<string>("ApiSettings.Secret");
 
@@ -32,28 +34,72 @@ namespace MagicVilla_VillaAPI.Repository
         public bool IsUniqueUser(string username)
         {
             var user = _db.ApplicationUsers.FirstOrDefault(x => x.UserName == username);
-            if(user == null) 
+            if (user == null)
             {
                 return true;
             }
             return false;
         }
 
-        public async Task<LoginResponseDTO> Login(LoginRequestDTO loginRequestDTO)
+        public async Task<TokenDTO> Login(LoginRequestDTO loginRequestDTO)
         {
             var user = _db.ApplicationUsers.FirstOrDefault(x => x.UserName.ToLower() == loginRequestDTO.UserName.ToLower());
-            
-            bool isValid = await _userManager.CheckPasswordAsync(user, loginRequestDTO.Password);   
 
-            if(user == null || !isValid)
+            bool isValid = await _userManager.CheckPasswordAsync(user, loginRequestDTO.Password);
+
+            if (user == null || !isValid)
             {
-                return new LoginResponseDTO()
+                return new TokenDTO()
                 {
-                    Token = "",
-                    User = null
+                    AccessToken = ""
                 };
             }
+            var jwtTokenId = $"JTI{Guid.NewGuid()}";
+            var accessToken = await GetAccessToken(user, jwtTokenId);
+            var refreshToken = await CreateNewRefreshToken(user.Id, jwtTokenId);
 
+            TokenDTO tokenDTO = new()
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
+            };
+            return tokenDTO;
+        }
+
+
+        public async Task<UserDTO> Register(RegisterationRequestDTO registerationRequestDTO)
+        {
+            ApplicationUser user = new()
+            {
+                UserName = registerationRequestDTO.UserName,
+                Email = registerationRequestDTO.UserName,
+                NormalizedEmail = registerationRequestDTO.UserName,
+                PasswordHash = registerationRequestDTO.Password,
+                Name = registerationRequestDTO.Name
+            };
+            try
+            {
+                var result = await _userManager.CreateAsync(user, registerationRequestDTO.Password);
+                if (result.Succeeded)
+                {
+                    if (!_roleManager.RoleExistsAsync(registerationRequestDTO.Role).GetAwaiter().GetResult())
+                    {
+                        await _roleManager.CreateAsync(new IdentityRole(registerationRequestDTO.Role));
+                    }
+
+                    await _userManager.AddToRoleAsync(user, registerationRequestDTO.Role);
+                    var userToReturn = _db.ApplicationUsers.FirstOrDefault(u => u.UserName == registerationRequestDTO.UserName);
+                    return _mapper.Map<UserDTO>(userToReturn);
+                }
+            } catch (Exception ex)
+            {
+
+            }
+            return new UserDTO();
+        }
+
+        private async Task<string> GetAccessToken(ApplicationUser user, string jwtTokenId)
+        {
             var roles = await _userManager.GetRolesAsync(user);
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(secretKey);
@@ -63,52 +109,114 @@ namespace MagicVilla_VillaAPI.Repository
                 Subject = new ClaimsIdentity(new Claim[]
                 {
                     new Claim(ClaimTypes.Name, user.UserName.ToString()),
-                    new Claim(ClaimTypes.Role, roles.FirstOrDefault())
+                    new Claim(ClaimTypes.Role, roles.FirstOrDefault()),
+                    new Claim(JwtRegisteredClaimNames.Jti, jwtTokenId),
+                    new Claim(JwtRegisteredClaimNames.Sub, user.Id)
                 }),
-                Expires = DateTime.UtcNow.AddDays(7),
-                SigningCredentials = new (new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+                Expires = DateTime.UtcNow.AddMinutes(60),
+                SigningCredentials = new(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            LoginResponseDTO loginResponseDTO = new LoginResponseDTO()
-            {
-                Token = tokenHandler.WriteToken(token),
-                User = _mapper.Map<UserDTO>(user)
-            };
-            return loginResponseDTO;
-
+            var tokenStr = tokenHandler.WriteToken(token);
+            return tokenStr;
         }
 
-        public async Task<UserDTO> Register(RegisterationRequestDTO registerationRequestDTO)
+        public async Task<TokenDTO> RefreshAccessToken(TokenDTO tokenDTO)
         {
-            ApplicationUser user = new()
+            // Find an existing refresh token
+
+            var existingRefreshToken = await _db.RefreshTokens.FirstOrDefaultAsync(x => x.Refresh_Token == tokenDTO.RefreshToken);
+            if (existingRefreshToken == null)
             {
-                UserName = registerationRequestDTO.UserName,
-                Email = registerationRequestDTO.UserName,
-                NormalizedEmail = registerationRequestDTO.UserName,
-                PasswordHash = registerationRequestDTO.Password,    
-                Name = registerationRequestDTO.Name
+                return new TokenDTO(); 
+            }
+
+            // Compare data from existing refresh token provided and if there is any missmatch then consider it as a fraud
+            var accessTokenData = GetAccessTokenData(tokenDTO.AccessToken);
+            if (!accessTokenData.isSuccessful || accessTokenData.userId != existingRefreshToken.UserId
+                || accessTokenData.tokenId != existingRefreshToken.JwtTokenId)
+            {
+                existingRefreshToken.IsValid = false;
+                _db.SaveChanges();
+            }
+
+            // When someone tries to use not valid refresh token, fraud possible
+            if (!existingRefreshToken.IsValid)
+            {
+                var chainRecords = _db.RefreshTokens.Where(x => x.UserId == existingRefreshToken.UserId
+                && x.JwtTokenId == existingRefreshToken.JwtTokenId);
+                foreach (var item in chainRecords)
+                {
+                    item.IsValid = false;
+                }
+                _db.UpdateRange(chainRecords);
+                _db.SaveChanges();
+                return new TokenDTO();
+            }
+            
+
+            // If jus expired then mark as invalid and return empty
+            if (existingRefreshToken.ExpiresAt < DateTime.UtcNow)
+            {
+                existingRefreshToken.IsValid = false;
+                _db.SaveChanges();
+                return new TokenDTO();
+            }
+
+            // Replace old refresh with a new one with updated expire date
+            var newRefreshToken = await CreateNewRefreshToken(existingRefreshToken.UserId, existingRefreshToken.JwtTokenId);
+
+
+            // revoke existing refresh token
+            existingRefreshToken.IsValid = false;
+            _db.SaveChanges();
+
+            // generate new access token
+            var applicationUser = _db.ApplicationUsers.FirstOrDefault(x => x.Id == existingRefreshToken.UserId);
+            if (applicationUser == null)
+                return new TokenDTO();
+
+            var newAccessToken = await GetAccessToken(applicationUser, existingRefreshToken.JwtTokenId);
+            return new TokenDTO()
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken
             };
+        }
+
+        private async Task<string> CreateNewRefreshToken(string userId, string tokenId)
+        {
+            RefreshToken refreshToken = new()
+            {
+                IsValid = true,
+                UserId = userId,
+                JwtTokenId = tokenId,
+                ExpiresAt = DateTime.UtcNow.AddDays(30),
+                Refresh_Token = Guid.NewGuid() + "-"+ Guid.NewGuid()
+            };
+
+            await _db.RefreshTokens.AddAsync(refreshToken); 
+            await _db.SaveChangesAsync();
+            return refreshToken.Refresh_Token;
+        }
+
+        private (bool isSuccessful, string userId, string tokenId) GetAccessTokenData(string accessToken)
+        {
             try
             {
-                var result = await _userManager.CreateAsync(user, registerationRequestDTO.Password);
-                if (result.Succeeded)
-                {
-                    if (!_roleManager.RoleExistsAsync("admin").GetAwaiter().GetResult())
-                    {
-                        await _roleManager.CreateAsync(new IdentityRole("admin"));
-                        await _roleManager.CreateAsync(new IdentityRole("customer"));
-                    }
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var jwt = tokenHandler.ReadJwtToken(accessToken);
 
-                    await _userManager.AddToRoleAsync(user, "admin");
-                    var userToReturn = _db.ApplicationUsers.FirstOrDefault(u => u.UserName == registerationRequestDTO.UserName);
-                    return _mapper.Map<UserDTO>(userToReturn);
-                }
-            }catch(Exception ex)
+                var jwtTolenId = jwt.Claims.FirstOrDefault(u => u.Type == JwtRegisteredClaimNames.Jti).Value;
+                var userId = jwt.Claims.FirstOrDefault(x => x.Type == JwtRegisteredClaimNames.Sub).Value;
+                return (true, userId, jwtTolenId);
+
+            }catch(Exception ex) 
             {
-
+                return (false, null, null);
             }
-            return new UserDTO();
         }
+
     }
 }

@@ -5,67 +5,66 @@ using MagicVilla_Web.Services.IServices;
 
 namespace MagicVilla_Web.Services
 {
-    public class VillaService : BaseServices, IVillaService
+    public class VillaService : IVillaService
     {
 
         private readonly IHttpClientFactory _clientFactory;
         private string villaUrl;
+        private readonly IBaseServices _baseServices;
 
-        public VillaService(IHttpClientFactory clientFactory, IConfiguration configuration) : base(clientFactory)
+        public VillaService(IHttpClientFactory clientFactory, IConfiguration configuration, IBaseServices baseServices)
         {
+            _baseServices = baseServices;   
             villaUrl = configuration.GetValue<string>("ServiceUrls:VillaAPI");
             _clientFactory = clientFactory;
         }
 
-        public Task<T> CreateAsync<T>(VillaCreateDTO dto, string token)
+        public async Task<T> CreateAsync<T>(VillaCreateDTO dto)
         {
-            return SendAsync<T>(new APIRequest()
+            return await _baseServices.SendAsync<T>(new APIRequest()
             {
                 ApiType = SD.ApiType.POST,
                 Data = dto,
-                Url = villaUrl + "/api/v1/villaAPI",
-                Token = token
+                Url = villaUrl + $"/api/{SD.CurrentAPIVersion}/villaAPI",
+                ContentType = SD.ContentType.MultipartFormData
             });
         }
 
-        public Task<T> DeleteAsync<T>(int id, string token)
+        public async Task<T> DeleteAsync<T>(int id)
         {
-            return SendAsync<T>(new APIRequest()
+            return await _baseServices.SendAsync<T>(new APIRequest()
             {
                 ApiType = SD.ApiType.DELETE,
-                Url = villaUrl + "/api/v1/villaAPI/" + id,
-                Token = token
+                Url = villaUrl + $"/api/{SD.CurrentAPIVersion}/villaAPI/" + id
             });
         }
 
-        public Task<T> GetAllAsync<T>(string token)
+        public async Task<T> GetAllAsync<T>()
         {
-            return SendAsync<T>(new APIRequest()
+            return await _baseServices.SendAsync<T>(new APIRequest()
             {
                 ApiType = SD.ApiType.GET,
-                Url = villaUrl + "/api/v1/villaAPI",
-                Token = token
+                Url = villaUrl + $"/api/{SD.CurrentAPIVersion}/villaAPI"
             });
         }
 
-        public Task<T> GetAsync<T>(int id, string token)
+        public async Task<T> GetAsync<T>(int id)
         {
-            return SendAsync<T>(new APIRequest()
+            return await _baseServices.SendAsync<T>(new APIRequest()
             {
                 ApiType = SD.ApiType.GET,
-                Url = villaUrl + "/api/v1/villaAPI/" + id,
-                Token = token
+                Url = villaUrl + $"/api/{SD.CurrentAPIVersion}/villaAPI/" + id
             });
         }
 
-        public Task<T> UpdateAsync<T>(VillaUpdateDTO dto, string token)
+        public async Task<T> UpdateAsync<T>(VillaUpdateDTO dto)
         {
-            return SendAsync<T>(new APIRequest()
+            return await _baseServices.SendAsync<T>(new APIRequest()
             {
                 ApiType = SD.ApiType.PUT,
                 Data = dto,
-                Url = villaUrl + "/api/v1/villaAPI/" + dto.Id,
-                Token = token
+                Url = villaUrl + $"/api/{SD.CurrentAPIVersion}/villaAPI/" + dto.Id,
+                ContentType = SD.ContentType.MultipartFormData
             });
         }
     }
