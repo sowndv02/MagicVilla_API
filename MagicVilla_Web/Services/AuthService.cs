@@ -22,7 +22,7 @@ namespace MagicVilla_Web.Services
             {
                 ApiType = SD.ApiType.POST,
                 Data = obj,
-                Url = villaUrl + "/api/UsersAuth/register"
+                Url = villaUrl + $"/api/{SD.CurrentAPIVersion}/UsersAuth/register"
             }, withBearer:false);
         }
 
@@ -32,8 +32,18 @@ namespace MagicVilla_Web.Services
             {
                 ApiType = SD.ApiType.POST,
                 Data = obj,
-                Url = villaUrl + "/api/UsersAuth/login"
+                Url = villaUrl + $"/api/{SD.CurrentAPIVersion}/UsersAuth/login"
             }, withBearer: false);
+        }
+
+        public async Task<T> LogoutAsync<T>(TokenDTO obj)
+        {
+            return await _baseServices.SendAsync<T>(new APIRequest()
+            {
+                ApiType = SD.ApiType.POST,
+                Data = obj,
+                Url = villaUrl + $"/api/{SD.CurrentAPIVersion}/UsersAuth/revoke"
+            });
         }
     }
 }
